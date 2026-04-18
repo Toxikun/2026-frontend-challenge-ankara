@@ -67,7 +67,13 @@ export const useSurveillanceData = () => {
                         } else if (type === 'Tip') {
                             involvedParty = parsed.suspectName;
                         } else if (type === 'Note') {
-                            involvedParty = parsed.mentionedPeople;
+                            const author = parsed.authorName || '';
+                            const mentioned = parsed.mentionedPeople || '';
+                            if (author && mentioned && mentioned !== '-') {
+                                involvedParty = `${author} (Mentions: ${mentioned})`;
+                            } else {
+                                involvedParty = author || mentioned || '-';
+                            }
                         }
 
                         return {
