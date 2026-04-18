@@ -162,7 +162,9 @@ const MapPage = () => {
 
             {selectedRawData && (
                 <RawDataModal
+                    isOpen={!!selectedRawData}
                     data={selectedRawData}
+                    title="Map Location Data"
                     onClose={() => setSelectedRawData(null)}
                 />
             )}
