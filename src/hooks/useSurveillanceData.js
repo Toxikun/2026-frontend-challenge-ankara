@@ -10,6 +10,23 @@ const FORM_IDS = {
     Tip: '261065875889981'
 };
 
+/**
+ * Normalize known name variants to a single canonical form.
+ * Handles Turkish character differences (ğ/g, İ/I, ı/i) and abbreviated names.
+ */
+const NAME_ALIASES = {
+    'kagan': 'Kağan',
+    'kağan': 'Kağan',
+    'kağan a.': 'Kağan',
+    'kagan a.': 'Kağan',
+};
+
+const normalizeName = (name) => {
+    if (!name || name === '-') return name;
+    const key = name.trim().toLowerCase();
+    return NAME_ALIASES[key] || name.trim();
+};
+
 const parseAnswers = (answers) => {
     const result = {};
     Object.values(answers).forEach(val => {
@@ -59,22 +76,26 @@ export const useSurveillanceData = () => {
                         const parsed = parseAnswers(sub.answers);
                         let involvedParty = '-';
                         if (type === 'Message') {
-                            involvedParty = parsed.senderName === 'Podo' ? parsed.recipientName : parsed.senderName;
+                            const sender = normalizeName(parsed.senderName);
+                            const recipient = normalizeName(parsed.recipientName);
+                            involvedParty = sender === 'Podo' ? recipient : sender;
                         } else if (type === 'Checkin') {
-                            involvedParty = parsed.personName;
+                            involvedParty = normalizeName(parsed.personName);
                         } else if (type === 'Sighting') {
-                            const witness = parsed.personName || '';
-                            const seenWith = parsed.seenWith || '';
+                            const witness = normalizeName(parsed.personName) || '';
+                            const seenWith = normalizeName(parsed.seenWith) || '';
                             if (witness && seenWith) {
                                 involvedParty = `${witness} & ${seenWith}`;
                             } else {
                                 involvedParty = witness || seenWith || '-';
                             }
                         } else if (type === 'Tip') {
-                            involvedParty = parsed.suspectName;
+                            involvedParty = normalizeName(parsed.suspectName);
                         } else if (type === 'Note') {
-                            const author = parsed.authorName || '';
-                            const mentioned = parsed.mentionedPeople || '';
+                            const author = normalizeName(parsed.authorName) || '';
+                            const mentioned = parsed.mentionedPeople
+                                ? parsed.mentionedPeople.split(',').map(n => normalizeName(n.trim())).join(', ')
+                                : '';
                             if (author && mentioned && mentioned !== '-') {
                                 involvedParty = `${author} (Mentions: ${mentioned})`;
                             } else {

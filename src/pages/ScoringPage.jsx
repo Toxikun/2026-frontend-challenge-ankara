@@ -132,7 +132,7 @@ const ScoringPage = () => {
             });
         });
 
-        // 2. Add Frequency Bonus + finalize
+        // 2. Add Frequency Bonus
         Object.values(suspectMap).forEach(p => {
             if (p.criticalWindowCount >= 3) {
                 p.autoScore += 2;
@@ -141,7 +141,78 @@ const ScoringPage = () => {
             if (p.lastTimePoints) {
                 p.reasons.push(`Time proximity bonus (+${p.lastTimePoints})`);
             }
-            p.finalScore = p.autoScore + p.manualOffset;
+        });
+
+        // 3. Co-Appearance Scoring (Guilt by Association)
+        // Suspects seen together share a portion of each other's scores.
+        // Closer to disappearance = higher shared fraction.
+        const coAppearancePairs = {}; // "A↔B" -> { maxMultiplier, tier }
+
+        events.forEach(event => {
+            const personNames = extractPersonNames(event.involvedParty);
+            if (personNames.length < 2) return; // Need at least 2 people
+
+            const eventTimePart = event.timestamp.split(' ')[1];
+            const eventMin = getMinutes(eventTimePart);
+            const diff = tRefMin - eventMin;
+
+            // Only consider events within 30 min before OR after disappearance
+            if (diff > 30) return;
+
+            // Determine multiplier tier
+            let multiplier = 0;
+            let tierLabel = '';
+            if (diff < 0) {
+                // Post-disappearance: 70%
+                multiplier = 0.7;
+                tierLabel = 'post-disappearance';
+            } else if (diff <= 10) {
+                // Within 10 min before: 50%
+                multiplier = 0.5;
+                tierLabel = '≤10min';
+            } else {
+                // 10-30 min before: 10%
+                multiplier = 0.1;
+                tierLabel = '10-30min';
+            }
+
+            // Create pairs from all names in this event
+            for (let i = 0; i < personNames.length; i++) {
+                for (let j = i + 1; j < personNames.length; j++) {
+                    const a = personNames[i].trim();
+                    const b = personNames[j].trim();
+                    if (!suspectMap[a] || !suspectMap[b]) continue;
+
+                    const pairKey = [a, b].sort().join('↔');
+                    if (!coAppearancePairs[pairKey] || coAppearancePairs[pairKey].multiplier < multiplier) {
+                        coAppearancePairs[pairKey] = { a, b, multiplier, tierLabel };
+                    }
+                }
+            }
+        });
+
+        // Apply co-appearance bonuses (use highest multiplier per pair)
+        Object.values(coAppearancePairs).forEach(({ a, b, multiplier, tierLabel }) => {
+            const personA = suspectMap[a];
+            const personB = suspectMap[b];
+            if (!personA || !personB) return;
+
+            const bonusForA = Math.round(personB.autoScore * multiplier * 10) / 10;
+            const bonusForB = Math.round(personA.autoScore * multiplier * 10) / 10;
+
+            if (bonusForA > 0) {
+                personA.autoScore += bonusForA;
+                personA.reasons.push(`Co-appeared w/ ${b} [${tierLabel}] (+${bonusForA})`);
+            }
+            if (bonusForB > 0) {
+                personB.autoScore += bonusForB;
+                personB.reasons.push(`Co-appeared w/ ${a} [${tierLabel}] (+${bonusForB})`);
+            }
+        });
+
+        // 4. Finalize scores
+        Object.values(suspectMap).forEach(p => {
+            p.finalScore = Math.round((p.autoScore + p.manualOffset) * 10) / 10;
         });
 
         return Object.values(suspectMap);
