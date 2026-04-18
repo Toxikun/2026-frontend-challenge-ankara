@@ -23,7 +23,18 @@ const EventTable = () => {
     const parseAnswers = (answers) => {
         const result = {};
         Object.values(answers).forEach(val => {
-            if (val.name) result[val.name] = val.answer;
+            if (val.name) {
+                // Handle complex answers like Full Name objects
+                if (typeof val.answer === 'object' && val.answer !== null) {
+                    if (val.answer.first || val.answer.last) {
+                        result[val.name] = `${val.answer.first || ''} ${val.answer.last || ''}`.trim();
+                    } else {
+                        result[val.name] = JSON.stringify(val.answer);
+                    }
+                } else {
+                    result[val.name] = val.answer;
+                }
+            }
         });
         return result;
     };
@@ -43,20 +54,36 @@ const EventTable = () => {
         const fetchAllEvents = async () => {
             setLoading(true);
             try {
-                const requests = Object.entries(FORM_IDS).map(([type, id]) => 
+                const requests = Object.entries(FORM_IDS).map(([type, id]) =>
                     axios.get(`https://api.jotform.com/form/${id}/submissions?apiKey=${API_KEY}`)
                         .then(res => ({ type, data: res.data.content }))
                 );
 
                 const results = await Promise.all(requests);
-                const combined = results.flatMap(({ type, data }) => 
+                const combined = results.flatMap(({ type, data }) =>
                     data.map(sub => {
                         const parsed = parseAnswers(sub.answers);
+
+                        // Logic to extract involved party/companion
+                        let involvedParty = '-';
+                        if (type === 'Message') {
+                            involvedParty = parsed.senderName === 'Podo' ? parsed.recipientName : parsed.senderName;
+                        } else if (type === 'Checkin') {
+                            involvedParty = parsed.personName;
+                        } else if (type === 'Sighting') {
+                            involvedParty = parsed.seenWith;
+                        } else if (type === 'Tip') {
+                            involvedParty = parsed.suspectName;
+                        } else if (type === 'Note') {
+                            involvedParty = parsed.mentionedPeople;
+                        }
+
                         return {
                             id: sub.id,
                             timestamp: parsed.timestamp || sub.created_at,
                             type: type,
                             location: parsed.location || 'Unknown',
+                            involvedParty: involvedParty || '-',
                             summary: getSummary(type, parsed),
                             raw: sub
                         };
@@ -104,7 +131,7 @@ const EventTable = () => {
 
             if (startMin !== null && eventMin < startMin) return false;
             if (endMin !== null && eventMin > endMin) return false;
-            
+
             return true;
         });
     }, [events, filters]);
@@ -119,7 +146,7 @@ const EventTable = () => {
     if (error) return (
         <div className="w-full bg-red-900/20 rounded-xl p-8 text-center border border-red-500/50 shadow-xl">
             <p className="text-red-400 font-semibold">{error}</p>
-            <button 
+            <button
                 onClick={() => window.location.reload()}
                 className="mt-4 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg border border-red-500/30 transition-all"
             >
@@ -148,7 +175,7 @@ const EventTable = () => {
                     </span>
                 </div>
             </div>
-            
+
             <div className="p-4 bg-slate-800/20 border-b border-slate-700">
                 <EventFilter onFilterChange={handleFilterChange} />
             </div>
@@ -160,6 +187,7 @@ const EventTable = () => {
                             <th className="p-4 font-semibold border-b border-slate-700">Timestamp</th>
                             <th className="p-4 font-semibold border-b border-slate-700">Type</th>
                             <th className="p-4 font-semibold border-b border-slate-700">Location</th>
+                            <th className="p-4 font-semibold border-b border-slate-700">Involved Party</th>
                             <th className="p-4 font-semibold border-b border-slate-700">Summary</th>
                             <th className="p-4 font-semibold border-b border-slate-700 text-right">Actions</th>
                         </tr>
@@ -167,7 +195,7 @@ const EventTable = () => {
                     <tbody className="divide-y divide-slate-700/50">
                         {filteredEvents.length === 0 ? (
                             <tr>
-                                <td colSpan="5" className="p-12 text-center text-slate-500 italic">
+                                <td colSpan="6" className="p-12 text-center text-slate-500 italic">
                                     {events.length === 0 ? "No data available. Waiting for transmission..." : "No events found matching current criteria."}
                                 </td>
                             </tr>
@@ -176,20 +204,24 @@ const EventTable = () => {
                                 <tr key={event.id} className="hover:bg-slate-700/30 transition-colors">
                                     <td className="p-4 text-sm font-mono text-slate-300">{event.timestamp}</td>
                                     <td className="p-4">
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                            event.type === 'Message' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
-                                            event.type === 'Tip' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                                            event.type === 'Checkin' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-                                            event.type === 'Sighting' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                                            'bg-slate-500/10 text-slate-400 border border-slate-500/20'
-                                        }`}>
+                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${event.type === 'Message' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
+                                                event.type === 'Tip' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                                    event.type === 'Checkin' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                                                        event.type === 'Sighting' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                                                            'bg-slate-500/10 text-slate-400 border border-slate-500/20'
+                                            }`}>
                                             {event.type}
                                         </span>
                                     </td>
                                     <td className="p-4 text-sm text-slate-300">{event.location}</td>
+                                    <td className="p-4 text-sm text-slate-300">
+                                        <span className={event.involvedParty !== '-' ? 'text-blue-300 font-medium' : 'text-slate-500'}>
+                                            {event.involvedParty}
+                                        </span>
+                                    </td>
                                     <td className="p-4 text-sm text-slate-400 max-w-md truncate">{event.summary}</td>
                                     <td className="p-4 text-right">
-                                        <button 
+                                        <button
                                             onClick={() => {
                                                 setSelectedEvent(event);
                                                 setIsModalOpen(true);
@@ -206,10 +238,10 @@ const EventTable = () => {
                 </table>
             </div>
 
-            <RawDataModal 
-                isOpen={isModalOpen} 
-                onClose={() => setIsModalOpen(false)} 
-                data={selectedEvent?.raw} 
+            <RawDataModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                data={selectedEvent?.raw}
                 title={`${selectedEvent?.type} submission (${selectedEvent?.id})`}
             />
         </div>
