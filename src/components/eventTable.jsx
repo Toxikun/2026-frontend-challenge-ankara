@@ -19,6 +19,7 @@ const EventTable = () => {
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [filters, setFilters] = useState({ startTime: '', endTime: '' });
+    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'none' });
 
     const parseAnswers = (answers) => {
         const result = {};
@@ -108,33 +109,61 @@ const EventTable = () => {
         setFilters(newFilters);
     }, []);
 
-    const filteredEvents = useMemo(() => {
-        if (!filters.startTime && !filters.endTime) return events;
+    const handleSort = (key) => {
+        let direction = 'asc';
+        if (sortConfig.key === key) {
+            if (sortConfig.direction === 'asc') direction = 'desc';
+            else if (sortConfig.direction === 'desc') direction = 'none';
+        }
+        setSortConfig({ key, direction });
+    };
 
-        const getMinutes = (timeStr) => {
-            if (!timeStr) return null;
-            const [h, m] = timeStr.split(':').map(Number);
-            return h * 60 + m;
-        };
+    const sortedEvents = useMemo(() => {
+        // 1. Filter
+        const filtered = events.filter(event => {
+            if (!filters.startTime && !filters.endTime) return true;
 
-        const startMin = getMinutes(filters.startTime);
-        const endMin = getMinutes(filters.endTime);
+            const getMinutes = (timeStr) => {
+                const [h, m] = timeStr.split(':').map(Number);
+                return h * 60 + m;
+            };
 
-        return events.filter(event => {
-            // Jotform created_at as fallback or parsed timestamp
-            // Typical format: "2024-05-15 14:30:00"
+            const startMin = filters.startTime ? getMinutes(filters.startTime) : null;
+            const endMin = filters.endTime ? getMinutes(filters.endTime) : null;
+
             const timePart = event.timestamp.split(' ')[1];
-            if (!timePart) return true; // Can't filter if no time part
+            if (!timePart) return true;
 
             const [h, m] = timePart.split(':').map(Number);
             const eventMin = h * 60 + m;
 
             if (startMin !== null && eventMin < startMin) return false;
             if (endMin !== null && eventMin > endMin) return false;
-
+            
             return true;
         });
-    }, [events, filters]);
+
+        // 2. Sort
+        if (!sortConfig.key || sortConfig.direction === 'none') {
+            return filtered;
+        }
+
+        return [...filtered].sort((a, b) => {
+            const aVal = a[sortConfig.key];
+            const bVal = b[sortConfig.key];
+
+            if (sortConfig.key === 'timestamp') {
+                const aTime = aVal.split(' ')[1] || '00:00';
+                const bTime = bVal.split(' ')[1] || '00:00';
+                return sortConfig.direction === 'asc' 
+                    ? aTime.localeCompare(bTime)
+                    : bTime.localeCompare(aTime);
+            }
+
+            const comparison = String(aVal).localeCompare(String(bVal));
+            return sortConfig.direction === 'asc' ? comparison : -comparison;
+        });
+    }, [events, filters, sortConfig]);
 
     if (loading) return (
         <div className="w-full bg-slate-800 rounded-xl p-12 text-center border border-slate-700 shadow-xl">
@@ -167,8 +196,8 @@ const EventTable = () => {
                 </h2>
                 <div className="flex gap-2">
                     <span className="px-3 py-1 bg-slate-900 rounded-full text-xs text-slate-400 border border-slate-700">
-                        {filteredEvents.length < events.length ? (
-                            <span>Filtered Results: <b className="text-blue-400">{filteredEvents.length}</b> / {events.length}</span>
+                        {sortedEvents.length < events.length ? (
+                            <span>Filtered Results: <b className="text-blue-400">{sortedEvents.length}</b> / {events.length}</span>
                         ) : (
                             <span>Total Events: {events.length}</span>
                         )}
@@ -184,25 +213,44 @@ const EventTable = () => {
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="bg-slate-900/50 text-slate-400 text-xs uppercase tracking-wider">
-                            <th className="p-4 font-semibold border-b border-slate-700">Timestamp</th>
-                            <th className="p-4 font-semibold border-b border-slate-700">Type</th>
-                            <th className="p-4 font-semibold border-b border-slate-700">Location</th>
-                            <th className="p-4 font-semibold border-b border-slate-700">Involved Party</th>
-                            <th className="p-4 font-semibold border-b border-slate-700">Summary</th>
+                            {[
+                                { key: 'timestamp', label: 'Timestamp' },
+                                { key: 'type', label: 'Type' },
+                                { key: 'location', label: 'Location' },
+                                { key: 'involvedParty', label: 'Involved Party' },
+                                { key: 'summary', label: 'Summary' }
+                            ].map((col) => (
+                                <th key={col.key} className="p-0 border-b border-slate-700">
+                                    <button 
+                                        onClick={() => handleSort(col.key)}
+                                        className="w-full text-left p-4 hover:bg-slate-700/50 transition-colors flex items-center justify-between group"
+                                    >
+                                        <span className={sortConfig.key === col.key && sortConfig.direction !== 'none' ? 'text-blue-400' : ''}>
+                                            {col.label}
+                                        </span>
+                                        <span className="flex flex-col ml-2 opacity-30 group-hover:opacity-100 transition-opacity">
+                                            <svg className={`w-2 h-2 ${sortConfig.key === col.key && sortConfig.direction === 'asc' ? 'text-blue-400 opacity-100' : ''}`} fill="currentColor" viewBox="0 0 24 24"><path d="M12 4l-8 8h16z"/></svg>
+                                            <svg className={`w-2 h-2 ${sortConfig.key === col.key && sortConfig.direction === 'desc' ? 'text-blue-400 opacity-100' : ''}`} fill="currentColor" viewBox="0 0 24 24"><path d="M12 20l8-8H4z"/></svg>
+                                        </span>
+                                    </button>
+                                </th>
+                            ))}
                             <th className="p-4 font-semibold border-b border-slate-700 text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-700/50">
-                        {filteredEvents.length === 0 ? (
+                        {sortedEvents.length === 0 ? (
                             <tr>
                                 <td colSpan="6" className="p-12 text-center text-slate-500 italic">
                                     {events.length === 0 ? "No data available. Waiting for transmission..." : "No events found matching current criteria."}
                                 </td>
                             </tr>
                         ) : (
-                            filteredEvents.map((event) => (
+                            sortedEvents.map((event) => (
                                 <tr key={event.id} className="hover:bg-slate-700/30 transition-colors">
-                                    <td className="p-4 text-sm font-mono text-slate-300">{event.timestamp}</td>
+                                    <td className="p-4 text-sm font-mono text-slate-300">
+                                        {event.timestamp.split(' ')[1] || event.timestamp}
+                                    </td>
                                     <td className="p-4">
                                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${event.type === 'Message' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
                                                 event.type === 'Tip' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
