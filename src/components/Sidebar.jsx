@@ -5,6 +5,7 @@ const Sidebar = () => {
     const navItems = [
         { name: 'Investigation Log', path: '/', icon: '📋' },
         { name: 'Podo Timeline', path: '/timeline', icon: '🕒' },
+        { name: 'Geospatial Map', path: '/map', icon: '🗺️' },
         { name: 'Scoring Center', path: '/scoring', icon: '🎯' }
     ];
 

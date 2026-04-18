@@ -3,6 +3,7 @@ import Sidebar from './components/Sidebar';
 import InvestigationPage from './pages/InvestigationPage';
 import ScoringPage from './pages/ScoringPage';
 import TimelinePage from './pages/TimelinePage';
+import MapPage from './pages/MapPage';
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
               <Route path="/" element={<InvestigationPage />} />
               <Route path="/timeline" element={<TimelinePage />} />
               <Route path="/scoring" element={<ScoringPage />} />
+              <Route path="/map" element={<MapPage />} />
             </Routes>
           </div>
         </main>
