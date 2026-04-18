@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import RawDataModal from './RawDataModal';
+import EventFilter from './EventFilter';
 
 const API_KEY = '54a934fa20b1ccc3a5bd1d2076f90556';
 const FORM_IDS = {
@@ -17,6 +18,7 @@ const EventTable = () => {
     const [error, setError] = useState(null);
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [filters, setFilters] = useState({ startTime: '', endTime: '' });
 
     const parseAnswers = (answers) => {
         const result = {};
@@ -75,6 +77,38 @@ const EventTable = () => {
         fetchAllEvents();
     }, []);
 
+    const handleFilterChange = useCallback((newFilters) => {
+        setFilters(newFilters);
+    }, []);
+
+    const filteredEvents = useMemo(() => {
+        if (!filters.startTime && !filters.endTime) return events;
+
+        const getMinutes = (timeStr) => {
+            if (!timeStr) return null;
+            const [h, m] = timeStr.split(':').map(Number);
+            return h * 60 + m;
+        };
+
+        const startMin = getMinutes(filters.startTime);
+        const endMin = getMinutes(filters.endTime);
+
+        return events.filter(event => {
+            // Jotform created_at as fallback or parsed timestamp
+            // Typical format: "2024-05-15 14:30:00"
+            const timePart = event.timestamp.split(' ')[1];
+            if (!timePart) return true; // Can't filter if no time part
+
+            const [h, m] = timePart.split(':').map(Number);
+            const eventMin = h * 60 + m;
+
+            if (startMin !== null && eventMin < startMin) return false;
+            if (endMin !== null && eventMin > endMin) return false;
+            
+            return true;
+        });
+    }, [events, filters]);
+
     if (loading) return (
         <div className="w-full bg-slate-800 rounded-xl p-12 text-center border border-slate-700 shadow-xl">
             <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -106,11 +140,19 @@ const EventTable = () => {
                 </h2>
                 <div className="flex gap-2">
                     <span className="px-3 py-1 bg-slate-900 rounded-full text-xs text-slate-400 border border-slate-700">
-                        Total Events: {events.length}
+                        {filteredEvents.length < events.length ? (
+                            <span>Filtered Results: <b className="text-blue-400">{filteredEvents.length}</b> / {events.length}</span>
+                        ) : (
+                            <span>Total Events: {events.length}</span>
+                        )}
                     </span>
                 </div>
             </div>
             
+            <div className="p-4 bg-slate-800/20 border-b border-slate-700">
+                <EventFilter onFilterChange={handleFilterChange} />
+            </div>
+
             <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                     <thead>
@@ -123,14 +165,14 @@ const EventTable = () => {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-700/50">
-                        {events.length === 0 ? (
+                        {filteredEvents.length === 0 ? (
                             <tr>
                                 <td colSpan="5" className="p-12 text-center text-slate-500 italic">
-                                    No data available. Waiting for transmission...
+                                    {events.length === 0 ? "No data available. Waiting for transmission..." : "No events found matching current criteria."}
                                 </td>
                             </tr>
                         ) : (
-                            events.map((event) => (
+                            filteredEvents.map((event) => (
                                 <tr key={event.id} className="hover:bg-slate-700/30 transition-colors">
                                     <td className="p-4 text-sm font-mono text-slate-300">{event.timestamp}</td>
                                     <td className="p-4">
