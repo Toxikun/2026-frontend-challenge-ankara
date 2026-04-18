@@ -18,7 +18,7 @@ const EventTable = () => {
     const [error, setError] = useState(null);
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [filters, setFilters] = useState({ startTime: '', endTime: '' });
+    const [filters, setFilters] = useState({ startTime: '', endTime: '', search: '', type: '' });
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'none' });
 
     const parseAnswers = (answers) => {
@@ -121,24 +121,38 @@ const EventTable = () => {
     const sortedEvents = useMemo(() => {
         // 1. Filter
         const filtered = events.filter(event => {
-            if (!filters.startTime && !filters.endTime) return true;
+            // Type Filter
+            if (filters.type && event.type !== filters.type) return false;
 
-            const getMinutes = (timeStr) => {
-                const [h, m] = timeStr.split(':').map(Number);
-                return h * 60 + m;
-            };
+            // Time Range Filter
+            if (filters.startTime || filters.endTime) {
+                const getMinutes = (timeStr) => {
+                    const [h, m] = timeStr.split(':').map(Number);
+                    return h * 60 + m;
+                };
 
-            const startMin = filters.startTime ? getMinutes(filters.startTime) : null;
-            const endMin = filters.endTime ? getMinutes(filters.endTime) : null;
+                const startMin = filters.startTime ? getMinutes(filters.startTime) : null;
+                const endMin = filters.endTime ? getMinutes(filters.endTime) : null;
 
-            const timePart = event.timestamp.split(' ')[1];
-            if (!timePart) return true;
+                const timePart = event.timestamp.split(' ')[1];
+                if (timePart) {
+                    const [h, m] = timePart.split(':').map(Number);
+                    const eventMin = h * 60 + m;
 
-            const [h, m] = timePart.split(':').map(Number);
-            const eventMin = h * 60 + m;
+                    if (startMin !== null && eventMin < startMin) return false;
+                    if (endMin !== null && eventMin > endMin) return false;
+                }
+            }
 
-            if (startMin !== null && eventMin < startMin) return false;
-            if (endMin !== null && eventMin > endMin) return false;
+            // Global Text Search
+            if (filters.search) {
+                const s = filters.search.toLowerCase();
+                const matches = 
+                    event.involvedParty.toLowerCase().includes(s) ||
+                    event.location.toLowerCase().includes(s) ||
+                    event.summary.toLowerCase().includes(s);
+                if (!matches) return false;
+            }
             
             return true;
         });
