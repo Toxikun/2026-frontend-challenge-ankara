@@ -63,7 +63,13 @@ export const useSurveillanceData = () => {
                         } else if (type === 'Checkin') {
                             involvedParty = parsed.personName;
                         } else if (type === 'Sighting') {
-                            involvedParty = parsed.seenWith;
+                            const witness = parsed.personName || '';
+                            const seenWith = parsed.seenWith || '';
+                            if (witness && seenWith) {
+                                involvedParty = `${witness} & ${seenWith}`;
+                            } else {
+                                involvedParty = witness || seenWith || '-';
+                            }
                         } else if (type === 'Tip') {
                             involvedParty = parsed.suspectName;
                         } else if (type === 'Note') {
