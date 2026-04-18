@@ -1,9 +1,10 @@
 import { useState } from 'react'
+import EventTable from './components/eventTable'
 
 function App() {
   return (
     <div>
-      <h1>Jotform Frontend Challenge 2026</h1>
+      <EventTable />
     </div>
   )
 }
