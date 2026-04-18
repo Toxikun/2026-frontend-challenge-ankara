@@ -13,6 +13,7 @@ An investigation-themed surveillance dashboard built for tracking the disappeara
 
 - **Investigation Log** — Unified event table with real-time data from all 5 Jotform forms, sortable by any column (timestamp asc/desc, type, location, etc.), and filterable by record type, time range, and global text search (person, location, content keywords). Includes a "Last Known Locations" summary panel.
 - **Timeline Analysis** — A vertical chronological timeline reconstructing Podo's journey with a visual **disappearance marker** at the point of vanishing (21:11). Post-disappearance events are highlighted in red.
+- **Geospatial Map** — An interactive map displaying all logged events as geographic pinpoints. Pins are color-coded (red for post-disappearance) and clickable to reveal event details and raw JSON metadata.
 - **Scoring Center** — Algorithmic suspect ranking system with multi-factor heuristic analysis:
   - **Time Proximity**: +5 (≤1 min), +4 (≤5 min), +2 (≤15 min), +1 (≤30 min) before disappearance
   - **Location Proximity**: +3 for being at the last known location within 10 minutes
@@ -32,6 +33,7 @@ An investigation-themed surveillance dashboard built for tracking the disappeara
 | **Vite** | 8.x | Build tool & dev server |
 | **React Router** | 7.x | Client-side routing |
 | **Axios** | 1.x | HTTP client for Jotform API |
+| **Leaflet & React-Leaflet** | 1.9.x | Interactive maps and geospatial visualization |
 | **Tailwind CSS** | 4.x | Utility-first CSS framework |
 | **PostCSS** | 8.x | CSS processing pipeline |
 
@@ -81,6 +83,7 @@ src/
 ├── pages/
 │   ├── InvestigationPage.jsx    # Investigation log + last known locations
 │   ├── TimelinePage.jsx         # Chronological timeline with disappearance marker
+│   ├── MapPage.jsx              # Interactive geospatial map of all events
 │   └── ScoringPage.jsx          # Suspect scoring & risk classification
 ├── App.jsx                      # Root component with routing
 ├── main.jsx                     # Application entry point
