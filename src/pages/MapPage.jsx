@@ -39,11 +39,11 @@ const hashString = (str) => {
 // Generate deterministic coordinates near Ankara based on location name
 const getCoordsForLocation = (locationName) => {
     if (!locationName || locationName === 'Unknown') return null;
-    
+
     // Spread markers around Ankara center dynamically based on string hash
     const latOffset = (hashString(locationName + "lat") - 0.5) * 0.05;
     const lngOffset = (hashString(locationName + "lng") - 0.5) * 0.05;
-    
+
     return [ANKARA_CENTER[0] + latOffset, ANKARA_CENTER[1] + lngOffset];
 };
 
@@ -77,7 +77,7 @@ const MapPage = () => {
             if (!coordCounts[coordKey]) coordCounts[coordKey] = 0;
             const offset = (coordCounts[coordKey] * 0.0001); // slight offset for overlapping items
             coordCounts[coordKey]++;
-            
+
             return {
                 ...e,
                 displayCoords: [e.coords[0] + offset, e.coords[1] + offset]
@@ -103,21 +103,21 @@ const MapPage = () => {
             <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex-1 relative isolate">
                 {/* z-0 ensures map doesn't overlap sidebar dropdowns */}
                 <div className="absolute inset-0 z-0">
-                    <MapContainer 
-                        center={ANKARA_CENTER} 
-                        zoom={13} 
+                    <MapContainer
+                        center={ANKARA_CENTER}
+                        zoom={13}
                         style={{ height: '100%', width: '100%', background: '#0f172a' }}
                     >
                         <TileLayer
                             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-                            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
                         />
-                        
+
                         {mappedEvents.map((event) => {
                             const isLate = isPostDisappearance(event.timestamp);
                             return (
-                                <Marker 
-                                    key={event.id} 
+                                <Marker
+                                    key={event.id}
                                     position={event.displayCoords}
                                     icon={isLate ? redIcon : new L.Icon.Default()}
                                 >
@@ -134,7 +134,7 @@ const MapPage = () => {
                                                 </div>
                                                 <h3 className="font-bold text-slate-800 text-base">{event.location}</h3>
                                             </div>
-                                            
+
                                             <div className="bg-slate-100 rounded-lg p-2">
                                                 <p className="text-sm text-slate-600">
                                                     <span className="font-semibold text-slate-900">Involved:</span> {event.involvedParty}
@@ -144,7 +144,7 @@ const MapPage = () => {
                                                 </p>
                                             </div>
 
-                                            <button 
+                                            <button
                                                 onClick={() => setSelectedRawData(event.raw)}
                                                 className="w-full text-xs font-bold uppercase tracking-wider bg-slate-900 hover:bg-slate-800 text-white py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-2"
                                             >
