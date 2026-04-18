@@ -4,6 +4,9 @@ import { useSurveillanceData } from '../hooks/useSurveillanceData';
 const T_REF = '21:11';
 const L_REF = 'Ankara Kalesi';
 
+// Names to always exclude from suspect list (the missing person + staff)
+const EXCLUDED_NAMES = ['podo', 'event staff', '-', ''];
+
 const ScoringPage = () => {
     const { events, loading, error } = useSurveillanceData();
     const [manualOffsets, setManualOffsets] = useState(() => {
@@ -24,71 +27,112 @@ const ScoringPage = () => {
 
     const tRefMin = getMinutes(T_REF);
 
+    /**
+     * Extract individual person names from a compound involvedParty string.
+     * Handles formats like: "Alice & Bob", "Alice (Mentions: Bob, Charlie)"
+     * Filters out Podo and other excluded names.
+     */
+    const extractPersonNames = (involvedParty) => {
+        if (!involvedParty || involvedParty === '-') return [];
+
+        let names = [];
+
+        // Handle "Author (Mentions: Person1, Person2)" format from Notes
+        const mentionMatch = involvedParty.match(/^(.+?)\s*\(Mentions:\s*(.+)\)$/);
+        if (mentionMatch) {
+            names.push(mentionMatch[1].trim());
+            mentionMatch[2].split(',').forEach(n => names.push(n.trim()));
+        }
+        // Handle "Person1 & Person2" format from Sightings
+        else if (involvedParty.includes(' & ')) {
+            names = involvedParty.split(' & ').map(n => n.trim());
+        }
+        // Single name
+        else {
+            names.push(involvedParty.trim());
+        }
+
+        // Filter out excluded names (Podo, Event Staff, etc.)
+        return names.filter(n => n && !EXCLUDED_NAMES.includes(n.toLowerCase()));
+    };
+
     const scores = useMemo(() => {
         const suspectMap = {};
 
         // 1. Identify and calculate Automatic Scores
         events.forEach(event => {
-            const name = event.involvedParty;
-            if (!name || name === '-' || name === 'Podo' || name === 'Event Staff') return;
-
-            // Normalize name (simplified)
-            const normalizedName = name.split(' ')[0].replace(/ğ/g, 'g').replace(/İ/g, 'I').replace(/ı/g, 'i');
-            
-            if (!suspectMap[normalizedName]) {
-                suspectMap[normalizedName] = {
-                    name, 
-                    autoScore: 0, 
-                    manualOffset: manualOffsets[normalizedName] || 0,
-                    reasons: [],
-                    lastSeen: '',
-                    eventCount: 0,
-                    criticalWindowCount: 0
-                };
-            }
-
-            const person = suspectMap[normalizedName];
-            person.eventCount++;
+            const personNames = extractPersonNames(event.involvedParty);
+            if (personNames.length === 0) return;
 
             const eventTimePart = event.timestamp.split(' ')[1];
             const eventMin = getMinutes(eventTimePart);
             const diff = tRefMin - eventMin;
 
-            // Time Proximity (only once per tier, highest wins)
-            let timePoints = 0;
-            if (diff >= 0 && diff <= 30) {
-                person.criticalWindowCount++;
-                if (diff <= 1) timePoints = 5;
-                else if (diff <= 5) timePoints = 4;
-                else if (diff <= 15) timePoints = 2;
-                else if (diff <= 30) timePoints = 1;
-                
-                if (timePoints > (person.lastTimePoints || 0)) {
-                    person.autoScore += (timePoints - (person.lastTimePoints || 0));
-                    person.lastTimePoints = timePoints;
-                }
-            }
+            personNames.forEach(personName => {
+                // Use full name as key for accurate grouping
+                const nameKey = personName.trim();
 
-            // Location Proximity
-            if (diff >= 0 && diff <= 10 && event.location === L_REF) {
-                if (!person.hasLocationBonus) {
-                    person.autoScore += 3;
-                    person.hasLocationBonus = true;
-                    person.reasons.push(`Nearby at ${L_REF} (+3)`);
+                if (!suspectMap[nameKey]) {
+                    suspectMap[nameKey] = {
+                        name: personName,
+                        autoScore: 0,
+                        manualOffset: manualOffsets[nameKey] || 0,
+                        reasons: [],
+                        lastSeenTime: null,
+                        lastSeenLocation: null,
+                        eventCount: 0,
+                        criticalWindowCount: 0,
+                        lastTimePoints: 0,
+                        hasLocationBonus: false,
+                        hasTipBonus: false
+                    };
                 }
-            }
 
-            // Intelligence: Mentioned in Tip after disappearance
-            if (event.type === 'Tip' && eventMin > tRefMin) {
-                if (!person.hasTipBonus) {
-                    person.autoScore += 5;
-                    person.hasTipBonus = true;
-                    person.reasons.push(`Post-event Tip mention (+5)`);
+                const person = suspectMap[nameKey];
+                person.eventCount++;
+
+                // Track last seen time (closest to disappearance, before it)
+                if (diff >= 0 && (!person.lastSeenTime || eventMin > getMinutes(person.lastSeenTime))) {
+                    person.lastSeenTime = eventTimePart;
+                    person.lastSeenLocation = event.location;
                 }
-            }
+
+                // Time Proximity scoring (cumulative per tier, highest wins)
+                let timePoints = 0;
+                if (diff >= 0 && diff <= 30) {
+                    person.criticalWindowCount++;
+                    if (diff <= 1) timePoints = 5;
+                    else if (diff <= 5) timePoints = 4;
+                    else if (diff <= 15) timePoints = 2;
+                    else if (diff <= 30) timePoints = 1;
+
+                    if (timePoints > (person.lastTimePoints || 0)) {
+                        person.autoScore += (timePoints - (person.lastTimePoints || 0));
+                        person.lastTimePoints = timePoints;
+                    }
+                }
+
+                // Location Proximity: within 10 min at the same location
+                if (diff >= 0 && diff <= 10 && event.location === L_REF) {
+                    if (!person.hasLocationBonus) {
+                        person.autoScore += 3;
+                        person.hasLocationBonus = true;
+                        person.reasons.push(`Near ${L_REF} within 10min (+3)`);
+                    }
+                }
+
+                // Intelligence: Mentioned in Anonymous Tip after disappearance
+                if (event.type === 'Tip' && eventMin > tRefMin) {
+                    if (!person.hasTipBonus) {
+                        person.autoScore += 5;
+                        person.hasTipBonus = true;
+                        person.reasons.push(`Post-disappearance Tip (+5)`);
+                    }
+                }
+            });
         });
 
-        // 2. Add Frequency Bonus
+        // 2. Add Frequency Bonus + finalize
         Object.values(suspectMap).forEach(p => {
             if (p.criticalWindowCount >= 3) {
                 p.autoScore += 2;
@@ -104,10 +148,9 @@ const ScoringPage = () => {
     }, [events, manualOffsets, tRefMin]);
 
     const handleAdjust = (name, amount) => {
-        const normalizedName = name.split(' ')[0].replace(/ğ/g, 'g').replace(/İ/g, 'I').replace(/ı/g, 'i');
         setManualOffsets(prev => ({
             ...prev,
-            [normalizedName]: (prev[normalizedName] || 0) + amount
+            [name]: (prev[name] || 0) + amount
         }));
     };
 
@@ -120,9 +163,9 @@ const ScoringPage = () => {
         const aVal = a[sortConfig.key];
         const bVal = b[sortConfig.key];
         const order = sortConfig.direction === 'asc' ? 1 : -1;
-        
+
         if (typeof aVal === 'string') return aVal.localeCompare(bVal) * order;
-        return (aVal - bVal) * order;
+        return ((aVal || 0) - (bVal || 0)) * order;
     });
 
     const getRiskLabel = (score) => {
@@ -159,6 +202,7 @@ const ScoringPage = () => {
                             <th className="p-6">Detective Adj.</th>
                             <th className="p-6 cursor-pointer hover:text-white" onClick={() => setSortConfig({ key: 'finalScore', direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'})}>Final Risk</th>
                             <th className="p-6">Risk Level</th>
+                            <th className="p-6 cursor-pointer hover:text-white" onClick={() => setSortConfig({ key: 'lastSeenTime', direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'})}>Last Seen</th>
                             <th className="p-6">Analysis Findings</th>
                         </tr>
                     </thead>
@@ -212,6 +256,16 @@ const ScoringPage = () => {
                                         <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-widest border ${risk.color}`}>
                                             {risk.label}
                                         </span>
+                                    </td>
+                                    <td className="p-6">
+                                        {person.lastSeenTime ? (
+                                            <div className="flex flex-col gap-1">
+                                                <span className="font-mono font-bold text-sm text-slate-200">{person.lastSeenTime}</span>
+                                                <span className="text-[10px] text-slate-500 truncate max-w-[120px]">{person.lastSeenLocation}</span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-slate-600 text-xs">N/A</span>
+                                        )}
                                     </td>
                                     <td className="p-6">
                                         <div className="flex flex-wrap gap-1">

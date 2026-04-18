@@ -32,14 +32,16 @@ const Sidebar = () => {
                                 : 'text-slate-500 hover:bg-slate-800/50 hover:text-slate-300 border border-transparent'}
                         `}
                     >
-                        <span className="text-lg opacity-70 group-hover:opacity-100 transition-opacity">
-                            {item.icon}
-                        </span>
-                        <span className="font-medium">{item.name}</span>
-
-                        {/* Status Indicator for active item */}
-                        {({ isActive }) => isActive && (
-                            <span className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_#3b82f6]"></span>
+                        {({ isActive }) => (
+                            <>
+                                <span className="text-lg opacity-70 group-hover:opacity-100 transition-opacity">
+                                    {item.icon}
+                                </span>
+                                <span className="font-medium">{item.name}</span>
+                                {isActive && (
+                                    <span className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_#3b82f6]"></span>
+                                )}
+                            </>
                         )}
                     </NavLink>
                 ))}
