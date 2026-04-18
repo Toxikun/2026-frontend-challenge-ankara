@@ -6,7 +6,11 @@ const TimelinePage = () => {
 
     // Sort chronologically (oldest first for timeline flow)
     const chronologicalEvents = useMemo(() => {
-        return [...events].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+        return [...events].sort((a, b) => {
+            const aTime = a.timestamp.split(' ')[1] || '00:00';
+            const bTime = b.timestamp.split(' ')[1] || '00:00';
+            return aTime.localeCompare(bTime);
+        });
     }, [events]);
 
     const lastEvent = events[0]; // Most recent since events is sorted DESC in hook
