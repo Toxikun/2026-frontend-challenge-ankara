@@ -3,8 +3,9 @@ import { NavLink } from 'react-router-dom';
 
 const Sidebar = () => {
     const navItems = [
-        { name: 'Investigation Log', path: '/' },
-        { name: 'Scoring Center', path: '/scoring' }
+        { name: 'Investigation Log', path: '/', icon: '📋' },
+        { name: 'Podo Timeline', path: '/timeline', icon: '🕒' },
+        { name: 'Scoring Center', path: '/scoring', icon: '🎯' }
     ];
 
     return (

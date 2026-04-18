@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import InvestigationPage from './pages/InvestigationPage';
 import ScoringPage from './pages/ScoringPage';
+import TimelinePage from './pages/TimelinePage';
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
           <div className="max-w-7xl mx-auto">
             <Routes>
               <Route path="/" element={<InvestigationPage />} />
+              <Route path="/timeline" element={<TimelinePage />} />
               <Route path="/scoring" element={<ScoringPage />} />
             </Routes>
           </div>
