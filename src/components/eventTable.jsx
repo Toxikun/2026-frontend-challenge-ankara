@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import RawDataModal from './RawDataModal';
 
 const API_KEY = '54a934fa20b1ccc3a5bd1d2076f90556';
 const FORM_IDS = {
@@ -14,6 +15,8 @@ const EventTable = () => {
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [selectedEvent, setSelectedEvent] = useState(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
     const parseAnswers = (answers) => {
         const result = {};
@@ -144,7 +147,13 @@ const EventTable = () => {
                                     <td className="p-4 text-sm text-slate-300">{event.location}</td>
                                     <td className="p-4 text-sm text-slate-400 max-w-md truncate">{event.summary}</td>
                                     <td className="p-4 text-right">
-                                        <button className="text-xs text-blue-400 hover:text-blue-300 transition-colors font-semibold">
+                                        <button 
+                                            onClick={() => {
+                                                setSelectedEvent(event);
+                                                setIsModalOpen(true);
+                                            }}
+                                            className="text-xs text-blue-400 hover:text-blue-300 transition-colors font-semibold py-1 px-2 hover:bg-blue-400/10 rounded"
+                                        >
                                             View Details
                                         </button>
                                     </td>
@@ -154,6 +163,13 @@ const EventTable = () => {
                     </tbody>
                 </table>
             </div>
+
+            <RawDataModal 
+                isOpen={isModalOpen} 
+                onClose={() => setIsModalOpen(false)} 
+                data={selectedEvent?.raw} 
+                title={`${selectedEvent?.type} submission (${selectedEvent?.id})`}
+            />
         </div>
     );
 };
